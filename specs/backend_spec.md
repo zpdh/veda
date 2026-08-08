@@ -11,6 +11,31 @@
 ## 1. Architecture Overview
 We adopt a **feature‑oriented modular monolith**.  All code lives in a single deployable unit (one Docker image, one process) but is organized by business feature (here: *leaderboard*).  Cross‑cutting concerns are placed in a shared `core/` package.
 
+## 2. Dependencies
+
+### 2.1 Runtime (requirements.txt)
+
+| Package | Version Constraint | Purpose |
+|---------|-------------------|---------|
+| `fastapi` | – | FastAPI framework (async HTTP) |
+| `uvicorn[standard]` | – | ASGI server |
+| `SQLAlchemy[asyncio]` | – | Async ORM |
+| `asyncpg` | – | PostgreSQL async driver |
+| `alembic` | – | Database migrations |
+| `structlog` | – | Structured JSON logger |
+| `pydantic` | – | Data validation & settings |
+| `pydantic-settings` | – | Settings management (BaseSettings) |
+
+### 2.2 Development / Testing (requirements-dev.txt)
+
+| Package | Version Constraint | Purpose |
+|---------|-------------------|---------|
+| `pytest` | – | Test runner |
+| `pytest-asyncio` | – | Async test support |
+| `httpx` | – | Async HTTP client for integration tests |
+| `testcontainers` | – | Spin‑up temporary PostgreSQL containers in CI |
+
+
 ### Package layout
 ```
 app/
