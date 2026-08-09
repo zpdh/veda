@@ -31,18 +31,18 @@ All timestamps are UTC and expressed in ISO‑8601 format.
 {
   "rank": 1,
   "playerName": "Alice",
-  "value": "Zenith"
+   "value": 5
 }
 ```
-*Constraints*: `rank` must be a positive integer, `playerName` a non‑empty string (max 255 chars), and `value` a non‑empty string representing the leaderboard value (e.g., "Zenith").
+*Constraints*: `rank` must be a positive integer, `playerName` a non‑empty string (max 255 chars), and `value` a non‑negative integer representing the number of clears for the entry.
 
 ### 3.2 `LeaderboardSnapshotIn`
 ```json
 {
   "leaderboardName": "global-rankings",
   "entries": [
-    { "rank": 1, "playerName": "Alice", "value": "Zenith" },
-    { "rank": 2, "playerName": "Bob", "value": "Zenith" }
+     { "rank": 1, "playerName": "Alice", "value": 5 },
+    { "rank": 2, "playerName": "Bob", "value": 3 }
   ]
 }
 ```

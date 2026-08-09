@@ -102,7 +102,7 @@ All DTOs are plain Pydantic models; `response` models set `orm_mode = True` for 
 SQLAlchemy declarative classes matching the schema from **`database_spec.md`**:
 * `Leaderboard` – PK `id`, unique `name`, timestamps (`created_at`, `updated_at`).
 * `LeaderboardSnapshot` – PK `id`, FK `leaderboard_id` (`ON DELETE CASCADE`), indexed `fetched_at`.
-* `LeaderboardEntry` – PK `id`, FK `snapshot_id` (`ON DELETE CASCADE`), `rank` (positive integer), `player_name`, `value` (text, NOT NULL), and a **unique constraint** on (`snapshot_id`, `rank`).
+* `LeaderboardEntry` – PK `id`, FK `snapshot_id` (`ON DELETE CASCADE`), `rank` (positive integer), `player_name`, `value` (integer, NOT NULL), and a **unique constraint** on (`snapshot_id`, `rank`).
 
 ### 3.4 Repository (`features/leaderboard/repositories/postgres.py`)
 Provides async methods:

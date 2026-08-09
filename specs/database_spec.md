@@ -30,7 +30,7 @@ This document defines the relational schema for the leaderboard feature and the 
 | `snapshot_id` | `bigint`    | `NOT NULL`, foreign key → `leaderboard_snapshot(id)` **ON DELETE CASCADE** |
 | `rank`     | `integer`   | `NOT NULL`, `CHECK (rank > 0)`, **UNIQUE(`snapshot_id`, `rank`)** |
 | `player_name` | `text`    | `NOT NULL` |
-| `value`    | `text`      | `NOT NULL` |
+| `value`    | `integer`    | `NOT NULL` |
 
 ---
 
