@@ -30,18 +30,19 @@ All timestamps are UTC and expressed in ISO‑8601 format.
 ```json
 {
   "rank": 1,
-  "playerName": "Alice"
+  "playerName": "Alice",
+  "value": "Zenith"
 }
 ```
-*Constraints*: `rank` must be a positive integer, `playerName` a non‑empty string (max 255 chars).
+*Constraints*: `rank` must be a positive integer, `playerName` a non‑empty string (max 255 chars), and `value` a non‑empty string representing the leaderboard value (e.g., "Zenith").
 
 ### 3.2 `LeaderboardSnapshotIn`
 ```json
 {
   "leaderboardName": "global-rankings",
   "entries": [
-    { "rank": 1, "playerName": "Alice" },
-    { "rank": 2, "playerName": "Bob" }
+    { "rank": 1, "playerName": "Alice", "value": "Zenith" },
+    { "rank": 2, "playerName": "Bob", "value": "Zenith" }
   ]
 }
 ```
@@ -79,8 +80,8 @@ Returned by the **GET** endpoint.
   "leaderboardName": "global-rankings",
   "fetchedAt": "2026-08-08T15:07:13Z",
   "entries": [
-    { "entryId": 987, "rank": 1, "playerName": "Alice" },
-    { "entryId": 988, "rank": 2, "playerName": "Bob" }
+    { "entryId": 987, "rank": 1, "playerName": "Alice", "value": "Zenith" },
+    { "entryId": 988, "rank": 2, "playerName": "Bob", "value": "Zenith" }
   ]
 }
 ```
