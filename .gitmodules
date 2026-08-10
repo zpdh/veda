@@ -1,3 +1,6 @@
 [submodule "veda-backend"]
 	path = veda-backend
 	url = git@github.com:zpdh/veda-backend.git
+[submodule "veda-scraper"]
+	path = veda-scraper
+	url = git@github.com:ezlixp/veda-scraper.git
