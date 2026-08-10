@@ -80,8 +80,8 @@ Returned by the **GET** endpoint.
   "leaderboardName": "global-rankings",
   "fetchedAt": "2026-08-08T15:07:13Z",
   "entries": [
-    { "entryId": 987, "rank": 1, "playerName": "Alice", "value": "Zenith" },
-    { "entryId": 988, "rank": 2, "playerName": "Bob", "value": "Zenith" }
+    { "entryId": 987, "rank": 1, "playerName": "Alice", "value": 5 },
+    { "entryId": 988, "rank": 2, "playerName": "Bob", "value": 3 }
   ]
 }
 ```
