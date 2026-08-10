@@ -81,7 +81,7 @@ app/
 | `core/config.py` | Centralised settings (`DB_URL`, optional feature flags). Uses `pydantic.BaseSettings`. |
 | `core/db.py` | Creates the async engine (`create_async_engine` with `asyncpg`), an `async_sessionmaker`, and a FastAPI dependency `get_db` that yields an `AsyncSession`. |
 | `core/logging.py` | Initialise a structured JSON logger (`structlog`). Exposes `logger = structlog.get_logger(__name__)`. |
-| `core/errors.py` | Defines domain exceptions (`NotFoundError`, `ConflictError`, `ValidationError`, etc.) and registers a FastAPI `exception_handler` that formats them as the **ErrorResponse** shape from `api_spec.md`. |
+| `core/errors.py` | Provides **generic** error handling — defines `ErrorDescription`, `CommonErrors`, `AppError` and registers a FastAPI `exception_handler` that formats errors as the **ErrorResponse** defined in the API spec. Feature‑specific error modules (e.g., `features/leaderboard/errors/errors.py`) extend `AppError`. |
 | `core/security.py` *(optional)* | JWT verification, `get_current_user` dependency, role‑based checks. Not required for the current MVP but placed for future growth. |
 
 ---
@@ -113,7 +113,7 @@ All methods receive an `AsyncSession` injected via the `core.db.get_db` dependen
 
 ### 3.5 Use Cases (`features/leaderboard/use_cases/`)
 Each file defines a callable class that encapsulates a single business operation:
-* **`GetLatestSnapshot`** – validates the optional time window, calls the repository, raises `NotFoundError` if nothing is found, and returns the entity.
+* **`GetLatestSnapshot`** – validates the optional time window, calls the repository, raises an appropriate `AppError` (e.g., `ERR_SNAPSHOT_NOT_FOUND` or `ERR_LEADERBOARD_NOT_FOUND`) if nothing is found, and returns the entity.
 * **`CreateSnapshot`** – validates the existence of the target leaderboard, delegates to the repository, and returns the created snapshot entity. Validation of duplicate ranks is performed by the DTO validator; any DB‑level `IntegrityError` (e.g., duplicate rank) is caught and re‑raised as a `ConflictError` with `ERR_DUPLICATE_RANK`.
 Both use cases are injected into the router via FastAPI `Depends`.
 
