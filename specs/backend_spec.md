@@ -78,7 +78,7 @@ app/
 ## 2. Core / Cross‑Cutting Packages
 | Module | Responsibility |
 |--------|----------------|
-| `core/config.py` | Centralised settings (`DB_URL`, optional feature flags). Uses `pydantic.BaseSettings`. |
+| `core/config.py` | Centralised settings (`database_url`, optional feature flags). Uses `pydantic.BaseSettings`. |
 | `core/db.py` | Creates the async engine (`create_async_engine` with `asyncpg`), an `async_sessionmaker`, and a FastAPI dependency `get_db` that yields an `AsyncSession`. |
 | `core/logging.py` | Initialise a structured JSON logger (`structlog`). Exposes `logger = structlog.get_logger(__name__)`. |
 | `core/errors.py` | Provides **generic** error handling — defines `ErrorDescription`, `CommonErrors`, `AppError` and registers a FastAPI `exception_handler` that formats errors as the **ErrorResponse** defined in the API spec. Feature‑specific error modules (e.g., `features/leaderboard/errors/errors.py`) extend `AppError`. |
@@ -107,14 +107,21 @@ SQLAlchemy declarative classes matching the schema from **`database_spec.md`**:
 ### 3.4 Repository (`features/leaderboard/repositories/postgres.py`)
 Provides async methods:
 * `get_latest_snapshot(leaderboard_id, from_ts?, to_ts?)` – query ordered by `fetched_at DESC`, limited to 1.
-* `create_snapshot(leaderboard_id, fetched_at, entries)` – inserts a snapshot row, then bulk‑inserts entry rows, commits, and returns the persisted snapshot entity.
-* `delete_old_snapshots()` – **not used in code** because cleanup is delegated to PostgreSQL `pg_cron` (see Section 5). The method remains for possible manual invocation or testing.
+* `create_snapshot(self, snapshot: LeaderboardSnapshot)` – persists a `LeaderboardSnapshot` ORM object (with its entries) and returns the persisted entity.
+* `delete_old_snapshots(self, retention_days: int = 7)` – removes snapshots older than the supplied retention period (default 7 days).
 All methods receive an `AsyncSession` injected via the `core.db.get_db` dependency.
 
-### 3.5 Use Cases (`features/leaderboard/use_cases/`)
+### 3.5 Errors (`features/leaderboard/errors/errors.py`)
+Feature‑specific error definitions extending `AppError`:
+* `LeaderboardError` – wraps `LeaderboardErrors` enum members:
+  * `DUPLICATE_RANK` – HTTP 400, code `ERR_DUPLICATE_RANK`
+  * `LEADERBOARD_NOT_FOUND` – HTTP 404, code `ERR_LEADERBOARD_NOT_FOUND`
+  * `SNAPSHOT_NOT_FOUND` – HTTP 404, code `ERR_SNAPSHOT_NOT_FOUND`
+
+### 3.6 Use Cases (`features/leaderboard/use_cases/`)
 Each file defines a callable class that encapsulates a single business operation:
-* **`GetLatestSnapshot`** – validates the optional time window, calls the repository, raises an appropriate `AppError` (e.g., `ERR_SNAPSHOT_NOT_FOUND` or `ERR_LEADERBOARD_NOT_FOUND`) if nothing is found, and returns the entity.
-* **`CreateSnapshot`** – validates the existence of the target leaderboard, delegates to the repository, and returns the created snapshot entity. Validation of duplicate ranks is performed by the DTO validator; any DB‑level `IntegrityError` (e.g., duplicate rank) is caught and re‑raised as a `ConflictError` with `ERR_DUPLICATE_RANK`.
+* `GetLatestSnapshot` – validates the optional time window, calls the repository, raises an appropriate `AppError` (e.g., `ERR_SNAPSHOT_NOT_FOUND` or `ERR_LEADERBOARD_NOT_FOUND`) if nothing is found, and returns the entity.
+* `CreateSnapshot` – validates the existence of the target leaderboard, persists snapshots within a `UnitOfWork`, and commits the transaction after all snapshots are stored. Duplicate‑rank validation is performed by the DTO validator; DB‑level integrity errors are mapped to `ERR_DUPLICATE_RANK`.
 Both use cases are injected into the router via FastAPI `Depends`.
 
 ---
@@ -180,4 +187,4 @@ Test coverage should aim for **≥ 90 %** of the leaderboard feature modules
 
 ---
 
-*Prepared by the Architect – 2026‑08‑08*
+*Prepared by the Architect – 2026‑08‑10*
