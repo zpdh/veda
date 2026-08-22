@@ -4,3 +4,6 @@
 [submodule "veda-scraper"]
 	path = veda-scraper
 	url = git@github.com:ezlixp/veda-scraper.git
+[submodule "veda-frontend"]
+	path = veda-frontend
+	url = ./veda-frontend
