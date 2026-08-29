@@ -7,8 +7,6 @@ services:
       POSTGRES_USER: veda
       POSTGRES_PASSWORD: veda
       POSTGRES_DB: veda
-    ports:
-      - "5432:5432"
     volumes:
       - pg_data:/var/lib/postgresql
     healthcheck:
@@ -21,8 +19,6 @@ services:
     image: redis:8-alpine
     container_name: veda-redis
     restart: unless-stopped
-    ports:
-      - "6379:6379"
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s
@@ -31,7 +27,7 @@ services:
   backend:
     build:
       context: ./veda-backend
-    container-name: veda-backend
+    container_name: veda-backend
     restart: unless-stopped
     env_file:
       - ./veda-backend/.env
@@ -46,10 +42,11 @@ services:
   frontend:
     build:
       context: ./veda-frontend
-      container-name: veda-frontend
-      restart: unless-stopped
+    container_name: veda-frontend
+    env_file: ./veda-frontend/.env
+    restart: unless-stopped
     ports:
-      - "5173:80"
+      - "80:80"
     depends_on:
       - backend
 
