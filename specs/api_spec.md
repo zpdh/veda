@@ -1,25 +1,28 @@
-# API Specification – Leaderboard & Player Service (v1.1)
+# API Specification – Leaderboard, Player & Config Service
 
-*Base path:* `/v1/api`
-*Content type:* `application/json`
-*Timestamps:* UTC, ISO-8601
+**Source of truth:** `veda-backend/` implementation
+**Base path:** `/api/v1`
+**Content type:** `application/json`
+**Timestamps:** UTC ISO-8601 values where returned by the API
 
 ---
 
 ## 1. Endpoints
 
-| Method | Path | Auth | Description |
-|--------|------|------|-------------|
-| GET | `/v1/api/leaderboards` | None | List all leaderboard names |
-| GET | `/v1/api/leaderboards/{leaderboardName}` | None | Latest snapshot for a leaderboard |
-| POST | `/v1/api/leaderboards/snapshot` | Bearer | Batch-create snapshots (scraper only) |
-| GET | `/v1/api/players/{playerName}` | None | Player profile and leaderboard entries |
+| Method | Path | Auth | Rate limit | Description |
+|---|---|---|---|---|
+| GET | `/api/v1/leaderboards` | None | 60/minute | List leaderboard names |
+| GET | `/api/v1/leaderboards/{leaderboard_name}` | None | 60/minute | Return the latest leaderboard snapshot |
+| POST | `/api/v1/leaderboards/snapshot` | Bearer shared secret | 5/minute | Batch-create snapshots |
+| GET | `/api/v1/players/{player_name}` | None | 60/minute | Return a player profile and entries |
+| GET | `/api/v1/config/` | None | 60/minute | Return static scraper configuration |
 
 ---
 
-## 2. Leaderboard DTOs
+## 2. Leaderboard request models
 
-### 2.1 `EntryIn`
+### `EntryIn`
+
 ```json
 {
   "rank": 1,
@@ -27,9 +30,15 @@
   "value": 5
 }
 ```
-*Constraints:* `rank` positive integer; `playerName` non-empty, max 16 chars, `^[a-zA-Z0-9_]+$`; `value` non-negative integer.
 
-### 2.2 `LeaderboardSnapshotIn`
+Constraints:
+
+- `rank`: integer greater than zero.
+- `playerName`: 1–16 characters matching `^[a-zA-Z0-9_]+$`.
+- `value`: integer greater than or equal to zero.
+
+### `LeaderboardSnapshotIn`
+
 ```json
 {
   "leaderboardName": "global-rankings",
@@ -39,42 +48,53 @@
   ]
 }
 ```
-*Validation:* `entries` min 1 element; ranks within a block must be unique (→ `ERR_DUPLICATE_RANK`).
 
-### 2.3 `CreateSnapshotRequest`
+`leaderboardName` must be 1–128 characters and match `^[a-zA-Z0-9 _.-]+$`. `entries` must contain at least one entry. Ranks must be unique within the block; duplicate ranks raise `ERR_DUPLICATE_RANK`.
+
+### `CreateSnapshotRequest`
+
 ```json
 {
   "snapshots": [
-    { "leaderboardName": "global-rankings", "entries": [ … ] },
-    { "leaderboardName": "weekly-challenges", "entries": [ … ] }
+    { "leaderboardName": "global-rankings", "entries": [/* entries */] },
+    { "leaderboardName": "weekly-challenges", "entries": [/* entries */] }
   ]
 }
 ```
-*Validation:* `snapshots` min 1 element. Atomic — if any block fails, nothing is persisted.
 
-### 2.4 `SnapshotResponse`
+`snapshots` must contain at least one snapshot. The request models accept Python field names as well as the documented camelCase aliases.
+
+---
+
+## 3. Leaderboard response models
+
+### `SnapshotResponse`
+
 ```json
 {
   "snapshotId": 124,
   "leaderboardName": "global-rankings",
-  "fetchedAt": "2026-08-08T15:07:13Z",
+  "fetchedAt": "2026-08-31T15:07:13Z",
   "entries": [
-    { "entryId": 987, "rank": 1, "playerName": "Alice", "value": 5 },
-    { "entryId": 988, "rank": 2, "playerName": "Bob", "value": 3 }
+    { "entryId": 987, "rank": 1, "playerName": "Alice", "value": 5 }
   ]
 }
 ```
 
-### 2.5 `SnapshotCreatedResponse`
+### `SnapshotCreatedResponse`
+
 ```json
 {
   "snapshotIds": [124, 125],
-  "fetchedAt": "2026-08-08T16:34:12Z",
+  "fetchedAt": "2026-08-31T16:34:12Z",
   "message": "Snapshots created successfully."
 }
 ```
 
-### 2.6 `LeaderboardNamesResponse`
+The POST operation uses the same `fetchedAt` value for every snapshot in the request and returns HTTP 201 after the database transaction commits.
+
+### `LeaderboardNamesResponse`
+
 ```json
 {
   "leaderboardNames": ["global-rankings", "weekly-challenges"]
@@ -83,62 +103,56 @@
 
 ---
 
-## 3. Leaderboard Endpoints
+## 4. Leaderboard endpoints
 
-### 3.1 GET `/v1/api/leaderboards`
+### `GET /api/v1/leaderboards`
 
-Returns all leaderboard names.
+Returns `LeaderboardNamesResponse` with HTTP 200.
 
-| Code | Body |
-|------|------|
-| 200 | `LeaderboardNamesResponse` |
-| 500 | `ErrorResponse` |
+### `GET /api/v1/leaderboards/{leaderboard_name}`
 
-### 3.2 GET `/v1/api/leaderboards/{leaderboardName}`
+Returns the latest `SnapshotResponse` with HTTP 200.
 
-Returns the most recent snapshot for the given leaderboard.
+| Code | Error code | Situation |
+|---:|---|---|
+| 404 | `ERR_LEADERBOARD_NOT_FOUND` | The name is not in the database. |
+| 404 | `ERR_SNAPSHOT_NOT_FOUND` | The leaderboard exists but has no snapshot. |
+| 429 | `ERR_RATE_LIMITED` | GET rate limit exceeded. |
+| 500 | `ERR_INTERNAL` | Unexpected server failure. |
 
-| Code | `errorCode` | Situation |
-|------|------------|-----------|
-| 200 | — | `SnapshotResponse` |
-| 404 | `ERR_LEADERBOARD_NOT_FOUND` | Name not in DB |
-| 404 | `ERR_SNAPSHOT_NOT_FOUND` | Leaderboard exists but has no snapshots |
-| 500 | `ERR_INTERNAL` | Unexpected failure |
+### `POST /api/v1/leaderboards/snapshot`
 
-### 3.3 POST `/v1/api/leaderboards/snapshot`
+Requires an `Authorization` header with a Bearer token equal to the configured `shared_secret`.
 
-Batch-creates snapshots. Called by the scraper (server-to-server). Requires Bearer token.
+Processing order:
 
-**Processing flow:**
-1. Validate request (Pydantic).
-2. For each `LeaderboardSnapshotIn`: upsert leaderboard by name, insert snapshot and entries.
-3. Upsert all unique player names into the `player` table.
-4. Commit (atomic).
-5. Invalidate Redis cache for all affected player names.
+1. Validate the request models.
+2. Upsert each leaderboard.
+3. Insert each snapshot and its entries.
+4. Upsert unique player names.
+5. Commit the unit of work.
+6. Delete affected Redis player-cache keys.
 
-| Code | `errorCode` | Situation |
-|------|------------|-----------|
-| 201 | — | `SnapshotCreatedResponse` |
-| 400 | `ERR_INVALID_REQUEST` | Malformed JSON / missing fields |
-| 400 | `ERR_DUPLICATE_RANK` | Duplicate rank within a snapshot block |
-| 401 | `ERR_UNAUTHORIZED` | Missing or invalid Bearer token |
-| 500 | `ERR_INTERNAL` | Unexpected failure |
+| Code | Error code | Situation |
+|---:|---|---|
+| 201 | — | Snapshots created successfully. |
+| 400 | `ERR_DUPLICATE_RANK` | Duplicate rank within a snapshot block. |
+| 401 | `ERR_UNAUTHORIZED` | Missing or invalid Bearer token. |
+| 429 | `ERR_RATE_LIMITED` | POST rate limit exceeded. |
+| 500 | `ERR_INTERNAL` | Unexpected server failure. |
+
+FastAPI request validation errors are handled by the framework unless an application error is raised by the request model. The application explicitly defines `ERR_DUPLICATE_RANK`; no separate application `ERR_INVALID_REQUEST` handler is defined.
 
 ---
 
-## 4. Player Endpoint
+## 5. Player endpoint
 
-### 4.1 GET `/v1/api/players/{playerName}`
+### `GET /api/v1/players/{player_name}`
 
-**Path parameter:** `playerName` — 1–16 chars, `^[a-zA-Z0-9_]+$`, case-insensitive.
+`player_name` must be 1–16 characters matching `^[a-zA-Z0-9_]+$`. Lookup is case-insensitive.
 
-**Behaviour:**
-1. Check Redis cache (`player:{lower(name)}`). Return cached response if present.
-2. Look up player by name (case-insensitive) in `player` table → 404 if not found.
-3. For each leaderboard, retrieve the player's entry from the most recent snapshot containing them (`DISTINCT ON leaderboard, ORDER BY fetched_at DESC`).
-4. Build and cache response. TTL defined by `CACHE_TTL_SECONDS`.
+The endpoint first checks Redis using `player:{lower(player_name)}`. On a cache miss, it looks up the player and returns one entry per leaderboard from the most recent snapshot containing that player. The response is then cached for `CACHE_TTL_SECONDS` (currently 3600 seconds).
 
-**Response (200) – `PlayerResponse`:**
 ```json
 {
   "username": "Alice",
@@ -150,24 +164,40 @@ Batch-creates snapshots. Called by the scraper (server-to-server). Requires Bear
 }
 ```
 
-`totalCompletions` = sum of `value` across all entries.
+`totalCompletions` is the sum of `value` across returned entries. Players are not created by GET; they are upserted during snapshot ingestion.
 
-| Code | `errorCode` | Situation |
-|------|------------|-----------|
-| 200 | — | `PlayerResponse` |
-| 404 | `ERR_PLAYER_NOT_FOUND` | Name not in `player` table |
-| 429 | `ERR_RATE_LIMITED` | Rate limit exceeded |
-| 500 | `ERR_INTERNAL` | Unexpected failure |
-
----
-
-## 5. Player Creation
-
-Players are **not created on GET**. They are upserted as a side effect of `POST /v1/api/leaderboards/snapshot` — every unique `playerName` in the payload is inserted into the `player` table (`ON CONFLICT DO NOTHING`). A player is visible on `GET /players/{name}` only after appearing in at least one posted snapshot.
+| Code | Error code | Situation |
+|---:|---|---|
+| 200 | — | Player profile returned. |
+| 404 | `ERR_PLAYER_NOT_FOUND` | Name is not in the player table. |
+| 429 | `ERR_RATE_LIMITED` | GET rate limit exceeded. |
+| 500 | `ERR_INTERNAL` | Unexpected server failure. |
 
 ---
 
-## 6. Error Response Shape
+## 6. Config endpoint
+
+### `GET /api/v1/config/`
+
+Returns HTTP 200 with the following shape:
+
+```json
+{
+  "config": [
+    { "leaderboardName": "Zenith Clears", "leaderboardId": "Zenith", "pages": 50 },
+    { "leaderboardName": "Silver Knights Tomb", "leaderboardId": "SKT", "pages": 50 },
+    { "leaderboardName": "P.O.R.T.A.L. Strike", "leaderboardId": "Portal", "pages": 50 }
+  ]
+}
+```
+
+Each config item contains `leaderboardName`, `leaderboardId`, and `pages`.
+
+---
+
+## 7. Error response
+
+Application errors use this shape:
 
 ```json
 {
@@ -177,21 +207,20 @@ Players are **not created on GET**. They are upserted as a side effect of `POST 
 }
 ```
 
+`details` is optional and may be `null` or omitted depending on the response model serialization.
+
+### Application error codes
+
+| HTTP | Error code | Defined situation |
+|---:|---|---|
+| 400 | `ERR_DUPLICATE_RANK` | Duplicate rank in a snapshot block. |
+| 401 | `ERR_UNAUTHORIZED` | Missing or invalid snapshot Bearer token. |
+| 404 | `ERR_LEADERBOARD_NOT_FOUND` | Leaderboard does not exist. |
+| 404 | `ERR_SNAPSHOT_NOT_FOUND` | Leaderboard has no snapshots. |
+| 404 | `ERR_PLAYER_NOT_FOUND` | Player does not exist. |
+| 429 | `ERR_RATE_LIMITED` | Configured rate limit exceeded. |
+| 500 | `ERR_INTERNAL` | Unexpected server exception. |
+
 ---
 
-## 7. All Error Codes
-
-| HTTP | `errorCode` | Situation |
-|------|------------|-----------|
-| 400 | `ERR_INVALID_REQUEST` | Malformed JSON, missing fields |
-| 400 | `ERR_DUPLICATE_RANK` | Duplicate rank in a snapshot block |
-| 401 | `ERR_UNAUTHORIZED` | Missing or invalid Bearer token |
-| 404 | `ERR_LEADERBOARD_NOT_FOUND` | Leaderboard name not in DB |
-| 404 | `ERR_SNAPSHOT_NOT_FOUND` | Leaderboard exists but has no snapshots |
-| 404 | `ERR_PLAYER_NOT_FOUND` | Player name not in `player` table |
-| 429 | `ERR_RATE_LIMITED` | Rate limit exceeded |
-| 500 | `ERR_INTERNAL` | Unexpected server error |
-
----
-
-*Updated by the Architect – 2026-08-30*
+*Updated from the backend implementation on 2026-08-31.*
