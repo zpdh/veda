@@ -7,3 +7,6 @@
 [submodule "veda-frontend"]
 	path = veda-frontend
 	url = git@github.com:zpdh/veda-frontend.git
+[submodule "veda-bot"]
+	path = veda-bot
+	url = git@github.com:ezlixp/veda-bot.git
