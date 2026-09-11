@@ -2,7 +2,7 @@
 
 **Live site:** [veda-utils.vercel.app](https://veda-utils.vercel.app)
 
-Veda is a leaderboard and player statistics tracker for the Minecraft server [Monumenta](https://playmonu.net). It collects in-game leaderboard data, stores snapshots in a database, and exposes that data through a REST API, a web UI, and a Discord bot.
+Veda is a leaderboard and player statistics tracker for the Minecraft server [Monumenta](https://playmonumenta.com/). It collects in-game leaderboard data, stores snapshots in a database, and exposes that data through a REST API, a web UI, and a Discord bot.
 
 ---
 
@@ -19,20 +19,35 @@ veda/
 
 ### How it fits together
 
-```
-Minecraft server
-      │
-      ▼
-veda-scraper  ──POST /api/v1/leaderboards/snapshot──►  veda-backend
-                                                              │
-                                           ┌──────────────────┤
-                                           ▼                  ▼
-                                      PostgreSQL            Redis
-                                           │
-                            ┌──────────────┴──────────────┐
-                            ▼                             ▼
-                       veda-frontend              veda-bot (Discord)
-                   (browser, Vercel)
+```mermaid
+flowchart LR
+    subgraph GAME["Minecraft"]
+        MC["Minecraft Server"]
+    end
+
+    subgraph DATA["Data Collection"]
+        SCR["veda-scraper"]
+    end
+
+    subgraph BACKEND["Backend"]
+        API["veda-backend"]
+        PG[("PostgreSQL")]
+        REDIS[("Redis")]
+    end
+
+    subgraph CLIENTS["Clients"]
+        FE["veda-frontend"]
+        BOT["veda-bot"]
+    end
+
+    MC --> SCR
+    SCR -->|"POST /api/v1/leaderboards/snapshot"| API
+
+    API <--> PG
+    API <--> REDIS
+
+    FE -->|"REST API"| API
+    BOT -->|"REST API"| API
 ```
 
 The scraper is a headless Fabric mod that logs into Monumenta, reads leaderboard chat messages, and POSTs the collected data to the backend. The backend stores snapshots and player records in PostgreSQL, caches player responses in Redis, and serves a read-only JSON API. The frontend and Discord bot both consume that public API.
@@ -174,14 +189,6 @@ npm run prod   # build + start
 
 The scraper is a Minecraft Fabric client mod. When launched, it connects to Monumenta, fires `/leaderboard` commands for each configured leaderboard, parses the chat output, and POSTs the collected entries to the backend ingestion endpoint. It then exits automatically.
 
-**Configuration** — create `config.json` (see `config.example.json`):
-
-```json
-[
-  { "leaderboardName": "Zenith Clears", "leaderboardId": "Zenith", "pages": 5 }
-]
-```
-
 **First-time login (interactive)**
 
 ```bash
@@ -227,25 +234,10 @@ make frontend   # Vite dev server on :5173
 |---|---|
 | Frontend | Vercel (auto-deployed from `veda-frontend/`) |
 | Backend | Docker (`docker compose up backend`) |
-| Bot | Self-hosted (Node.js process or container) |
+| Bot | Self-hosted for now (Node.js process or container) |
 | Scraper | Docker, run on demand or on a schedule |
 
 The root `docker-compose.yml` orchestrates backend, frontend, PostgreSQL, and Redis on a shared Docker network (`shared`). The scraper has its own `veda-scraper/docker-compose.yaml` on the same network.
-
----
-
-## Database
-
-PostgreSQL with four tables:
-
-| Table | Description |
-|---|---|
-| `leaderboard` | Leaderboard metadata (name, estimated completion time, group size) |
-| `leaderboard_snapshot` | One snapshot per leaderboard per ingestion run |
-| `leaderboard_entry` | Individual rank/player/value rows within a snapshot |
-| `player` | Unique player records, upserted during ingestion |
-
-Migrations are managed with Alembic (`veda-backend/app/migrations/versions/`).
 
 ---
 
