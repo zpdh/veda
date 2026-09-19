@@ -104,12 +104,15 @@ VITE_API_URL=http://localhost:8000
 | Method | Path | Auth | Description |
 |---|---|---|---|
 | `GET` | `/api/v1/leaderboards` | — | List all leaderboards |
+| `GET` | `/api/v1/leaderboards/weight` | — | Global weight leaderboard (all players, ranked) |
 | `GET` | `/api/v1/leaderboards/{name}` | — | Latest snapshot for a leaderboard |
 | `POST` | `/api/v1/leaderboards/snapshot` | Bearer secret | Ingest new snapshots (scraper use only) |
 | `GET` | `/api/v1/players/` | — | List all player names |
-| `GET` | `/api/v1/players/{name}` | — | Player profile with per-leaderboard stats |
+| `GET` | `/api/v1/players/{name}` | — | Player profile with persisted weight and per-leaderboard stats |
+| `GET` | `/api/v1/players/achievements/{name}` | — | Player achievement progress (from Monumenta API) |
 
-Rate limits: 60 req/min on all GET endpoints, 5 req/min on the POST ingest endpoint. Player responses are cached in Redis for 1 hour.
+Rate limits: 60 req/min on all GET endpoints, 5 req/min on the POST ingest endpoint. Player responses are cached in Redis for 1 hour; achievements for 10 minutes.
+
 
 **Setup**
 
